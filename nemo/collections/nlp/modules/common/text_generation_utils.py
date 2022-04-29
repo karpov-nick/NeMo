@@ -373,7 +373,7 @@ def synced_generate(
         if all_probs:
             src = parallel_state.get_pipeline_model_parallel_last_rank()
             group = parallel_state.get_embedding_group()
-            torch.distributed.broadcast(full_logits, src, group)
+            torch.distributed.broadcast(full_logits.cuda(), src, group)
 
     else:
         if parallel_state.is_pipeline_first_stage():
@@ -396,7 +396,7 @@ def synced_generate(
                 )
                 torch.distributed.broadcast(full_logits, src, group)
     if tokens is not None:
-        return tokens[:, :context_length], output_logits, full_logits
+        return tokens[:, :context_length], output_logits, full_logits.cpu()
 
 
 def generate(
@@ -708,7 +708,7 @@ def sample_sequence_batch(
                     output_logits = torch.gather(output_context, 2, indices).squeeze(2)
                     all_generated_indices = indices[:, :, 0]
                     if all_probs:
-                        full_logits = output_context
+                        full_logits = output_context.cpu()
                 else:
                     output_context = F.log_softmax(output, 2)
                     indices = torch.unsqueeze(new_tokens, 1).unsqueeze(2)
@@ -718,7 +718,7 @@ def sample_sequence_batch(
                     output_logits = torch.cat([output_logits, new_output_logits], 1)
                     all_generated_indices = torch.cat([all_generated_indices, indices[:, :, 0]], 1)
                     if all_probs:
-                        full_logits = torch.cat([full_logits, output_context], 1)
+                        full_logits = torch.cat([full_logits, output_context.cpu()], 1)
 
                 src = parallel_state.get_pipeline_model_parallel_last_rank()
                 group = parallel_state.get_embedding_group()
